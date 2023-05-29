@@ -92,11 +92,15 @@ int kvs_fifo_set(kvs_fifo_t* kvs_fifo, const char* key, const char* value) {
       return 0;
     }
   }
-  if (kvs_fifo->cursorcap < kvs_fifo->capacity) {
+  if (kvs_fifo->capacity == 0 &&
+      kvs_base_set(kvs_fifo->kvs_base, key, value) != 0) {
+    return FAILURE;
+  } else if (kvs_fifo->capacity > 0 &&
+             kvs_fifo->cursorcap < kvs_fifo->capacity) {
     kvs_fifo->list[kvs_fifo->cursorcap++] =
         kvs_pair_new(key, value, 1);  // set to 1 cause it's a SET operation
     // kvs_fifo_print(kvs_fifo);
-  } else {
+  } else if (kvs_fifo->capacity > 0) {
     if (kvs_fifo->list[kvs_fifo->cursor]->type &&
         kvs_base_set(kvs_fifo->kvs_base, kvs_fifo->list[kvs_fifo->cursor]->key,
                      kvs_fifo->list[kvs_fifo->cursor]->value) != 0) {
@@ -128,10 +132,10 @@ int kvs_fifo_get(kvs_fifo_t* kvs_fifo, const char* key, char* value) {
   // cache the key-value pair (employing the specified replacement strategy if
   // need be).
   if (kvs_base_get(kvs_fifo->kvs_base, key, value) != 0) return FAILURE;
-  if (kvs_fifo->cursorcap < kvs_fifo->capacity) {
+  if (kvs_fifo->capacity > 0 && kvs_fifo->cursorcap < kvs_fifo->capacity) {
     kvs_fifo->list[kvs_fifo->cursorcap++] = kvs_pair_new(key, value, 0);
     // kvs_fifo_print(kvs_fifo);
-  } else {
+  } else if (kvs_fifo->capacity > 0) {
     // might change this later
     if (kvs_fifo->list[kvs_fifo->cursor]->type &&
         kvs_base_set(kvs_fifo->kvs_base, kvs_fifo->list[kvs_fifo->cursor]->key,
