@@ -99,10 +99,15 @@ int kvs_clock_set(kvs_clock_t* kvs_clock, const char* key, const char* value) {
   }
   // If not found
   // If we didn't fill up the buffer yet
-  if (kvs_clock->cursorcap < kvs_clock->capacity) {
+
+  if (kvs_clock->capacity == 0 &&
+      kvs_base_set(kvs_clock->kvs_base, key, value) != 0) {
+    return FAILURE;
+  } else if (kvs_clock->capacity > 0 &&
+             kvs_clock->cursorcap < kvs_clock->capacity) {
     kvs_clock->list[kvs_clock->cursorcap++] = kvs_pair_newc(key, value, 1, 1);
     kvs_clock_print(kvs_clock);
-  } else {
+  } else if (kvs_clock->capacity > 0) {
     // We need to evict here
     while (kvs_clock->list[kvs_clock->cursor] &&
            kvs_clock->list[kvs_clock->cursor]->reference) {
@@ -119,7 +124,6 @@ int kvs_clock_set(kvs_clock_t* kvs_clock, const char* key, const char* value) {
     kvs_clock->list[kvs_clock->cursor] = kvs_pair_newc(key, value, 1, 1);
     kvs_clock_print(kvs_clock);
   }
-
   return 0;
 }
 
@@ -130,16 +134,17 @@ int kvs_clock_get(kvs_clock_t* kvs_clock, const char* key, char* value) {
   for (int i = 0; i < kvs_clock->capacity; i++) {
     if (kvs_clock->list[i] && strcmp(key, kvs_clock->list[i]->key) == 0) {
       strcpy(value, kvs_clock->list[i]->value);
+      kvs_clock->list[i]->reference = 1;
       kvs_clock_print(kvs_clock);
       return 0;
     }
   }
   if (kvs_base_get(kvs_clock->kvs_base, key, value) != 0) return FAILURE;
   // When there's no value in the queue, we add it to the queue
-  if (kvs_clock->cursorcap < kvs_clock->capacity) {
+  if (kvs_clock->capacity > 0 && kvs_clock->cursorcap < kvs_clock->capacity) {
     kvs_clock->list[kvs_clock->cursorcap++] = kvs_pair_newc(key, value, 0, 1);
     kvs_clock_print(kvs_clock);
-  } else {
+  } else if (kvs_clock->capacity > 0) {
     // We need to evict something
     // Cyclic rotation
     while (kvs_clock->list[kvs_clock->cursor] &&
