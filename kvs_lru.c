@@ -174,11 +174,15 @@ int kvs_lru_set(kvs_lru_t* kvs_lru, const char* key, const char* value) {
   // the disk. In addition to writing the value to the given pointer, it should
   // cache the key-value pair (employing the specified replacement strategy if
   // need be).
-  if (kvs_lru->list->length < kvs_lru->capacity) {
+  if (kvs_lru->capacity == 0 &&
+      kvs_base_set(kvs_lru->kvs_base, key, value) != 0) {
+    return FAILURE;
+  } else if (kvs_lru->capacity > 0 &&
+             kvs_lru->list->length < kvs_lru->capacity) {
     // not fully filled yet
     prepend(kvs_lru->list, new_node(key, value, 1));
     print_list(kvs_lru->list);
-  } else {
+  } else if (kvs_lru->capacity > 0) {
     // need to evict something
     kvs_node* evict = kvs_lru->list->back;
     if (evict->type &&
@@ -207,11 +211,11 @@ int kvs_lru_get(kvs_lru_t* kvs_lru, const char* key, char* value) {
     start = start->next;
   }
   if (kvs_base_get(kvs_lru->kvs_base, key, value) != 0) return FAILURE;
-  if (kvs_lru->list->length < kvs_lru->capacity) {
+  if (kvs_lru->capacity > 0 && kvs_lru->list->length < kvs_lru->capacity) {
     // not fully filled yet
     prepend(kvs_lru->list, new_node(key, value, 0));
     print_list(kvs_lru->list);
-  } else {
+  } else if (kvs_lru->capacity > 0) {
     // need to evict something
     kvs_node* evict = kvs_lru->list->back;
     if (evict->type &&
